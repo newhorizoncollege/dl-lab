@@ -1,0 +1,290 @@
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.datasets import mnist
+
+# Load dataset
+(x_train, y_train), (x_test, y_test) = mnist.load_data()
+
+# Preprocessing
+x_train = x_train.reshape(-1,784)/255.0
+x_test = x_test.reshape(-1,784)/255.0
+
+# 3-Layer Neural Network
+model = Sequential([
+    Dense(128, activation='relu', input_shape=(784,)),
+    Dense(64, activation='relu'),
+    Dense(10, activation='softmax')
+])
+
+# Compile
+model.compile(optimizer='adam',
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
+
+# Train
+model.fit(x_train, y_train, epochs=5, batch_size=32)
+
+# Test Accuracy
+loss, acc = model.evaluate(x_test, y_test)
+print("Accuracy:", acc)
+
+
+EXP_8
+import tensorflow as tf
+import matplotlib.pyplot as plt
+from tensorflow.keras.models import Sequential, Model
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
+from tensorflow.keras.datasets import mnist
+
+# Load data
+(x_train,y_train),(x_test,y_test)=mnist.load_data()
+
+# Normalize
+x_train=x_train.reshape(-1,28,28,1)/255.0
+x_test=x_test.reshape(-1,28,28,1)/255.0
+
+# CNN Model
+model=Sequential([
+    Conv2D(32,(3,3),activation='relu',input_shape=(28,28,1)),
+    MaxPooling2D(2,2),
+
+    Conv2D(64,(3,3),activation='relu'),
+    MaxPooling2D(2,2),
+
+    Flatten(),
+
+    Dense(128,activation='relu'),
+
+    Dropout(0.5),
+
+    Dense(10,activation='softmax')
+])
+
+model.compile(optimizer='adam',
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
+
+model.fit(x_train,y_train,epochs=5)
+
+loss,acc=model.evaluate(x_test,y_test)
+print("Accuracy:",acc)
+
+# Feature Maps
+feature_model=Model(inputs=model.input,
+                    outputs=model.layers[0].output)
+
+feature=feature_model.predict(x_test[:1])
+
+plt.figure(figsize=(8,4))
+for i in range(6):
+    plt.subplot(2,3,i+1)
+    plt.imshow(feature[0,:,:,i],cmap='gray')
+    plt.axis('off')
+plt.show()
+
+
+
+EXP_9
+import tensorflow as tf
+import matplotlib.pyplot as plt
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, BatchNormalization, Dropout
+from tensorflow.keras.datasets import mnist
+
+# Load dataset
+(x_train,y_train),(x_test,y_test)=mnist.load_data()
+
+# Preprocessing
+x_train=x_train.reshape(-1,784)/255.0
+x_test=x_test.reshape(-1,784)/255.0
+
+# ------------------------
+# Model Without Batch Normalization
+# ------------------------
+model1=Sequential([
+    Dense(128,activation='relu',input_shape=(784,)),
+    Dense(64,activation='relu'),
+    Dense(10,activation='softmax')
+])
+
+model1.compile(optimizer='adam',
+               loss='sparse_categorical_crossentropy',
+               metrics=['accuracy'])
+
+h1=model1.fit(x_train,y_train,
+              epochs=5,
+              validation_split=0.2)
+
+# ------------------------
+# Model With Batch Normalization
+# ------------------------
+model2=Sequential([
+    Dense(128,activation='relu',input_shape=(784,)),
+    BatchNormalization(),
+    Dropout(0.5),
+
+    Dense(64,activation='relu'),
+    BatchNormalization(),
+    Dropout(0.5),
+
+    Dense(10,activation='softmax')
+])
+
+model2.compile(optimizer='adam',
+               loss='sparse_categorical_crossentropy',
+               metrics=['accuracy'])
+
+h2=model2.fit(x_train,y_train,
+              epochs=5,
+              validation_split=0.2)
+
+# Test Accuracy
+print("Without BN:",model1.evaluate(x_test,y_test)[1])
+print("With BN:",model2.evaluate(x_test,y_test)[1])
+
+# Accuracy Graph
+plt.plot(h1.history['accuracy'],label='Without BN')
+plt.plot(h2.history['accuracy'],label='With BN')
+plt.legend()
+plt.title("Accuracy Comparison")
+plt.show()
+
+# Loss Graph
+plt.plot(h1.history['loss'],label='Without BN')
+plt.plot(h2.history['loss'],label='With BN')
+plt.legend()
+plt.title("Loss Comparison")
+plt.show()
+
+
+
+EXp-10
+import numpy as np
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Embedding, SimpleRNN, Dense
+
+# Sample text data
+text = [
+    "deep learning is fun",
+    "deep learning is powerful",
+    "machine learning is useful"
+]
+
+# Tokenization
+tokenizer = Tokenizer()
+tokenizer.fit_on_texts(text)
+
+total_words = len(tokenizer.word_index) + 1
+
+# Create input sequences
+input_sequences = []
+
+for line in text:
+    token_list = tokenizer.texts_to_sequences([line])[0]
+    for i in range(1, len(token_list)):
+        input_sequences.append(token_list[:i+1])
+
+# Padding
+max_len = max(len(x) for x in input_sequences)
+input_sequences = pad_sequences(input_sequences, maxlen=max_len, padding='pre')
+
+# Split data
+X = input_sequences[:, :-1]
+y = input_sequences[:, -1]
+
+# Model
+model = Sequential([
+    Embedding(total_words, 10, input_length=max_len-1),
+    SimpleRNN(32),
+    Dense(total_words, activation='softmax')
+])
+
+# Compile
+model.compile(loss='sparse_categorical_crossentropy',
+              optimizer='adam',
+              metrics=['accuracy'])
+
+# Train
+model.fit(X, y, epochs=100, verbose=1)
+
+# Prediction
+seed_text = "deep learning"
+token_list = tokenizer.texts_to_sequences([seed_text])[0]
+token_list = pad_sequences([token_list], maxlen=max_len-1, padding='pre')
+
+pred = np.argmax(model.predict(token_list), axis=-1)[0]
+
+for word, index in tokenizer.word_index.items():
+    if index == pred:
+        print("Next word:", word)
+
+
+EXp-12
+
+import tensorflow as tf
+import matplotlib.pyplot as plt
+from tensorflow.keras import layers, models
+
+# Load dataset
+(x_train, _), (x_test, _) = tf.keras.datasets.mnist.load_data()
+
+# Normalize and reshape
+x_train = x_train / 255.0
+x_test = x_test / 255.0
+
+x_train = x_train.reshape(-1, 784)
+x_test = x_test.reshape(-1, 784)
+
+# Function to build autoencoder
+def build_model(lr=0.001):
+    model = models.Sequential([
+        layers.Dense(128, activation='relu', input_shape=(784,)),
+        layers.Dense(64, activation='relu'),
+        layers.Dense(32, activation='relu'),   # encoded layer
+
+        layers.Dense(64, activation='relu'),
+        layers.Dense(128, activation='relu'),
+        layers.Dense(784, activation='sigmoid')  # output image
+    ])
+
+    model.compile(optimizer=tf.keras.optimizers.Adam(lr),
+                  loss='mse')
+    return model
+
+# Hyperparameters (experiment these)
+learning_rates = [0.001]
+batch_sizes = [32, 64]
+epochs_list = [5, 10]
+
+# Train model (choose one setting for exam simplicity)
+model = build_model(lr=0.001)
+
+history = model.fit(
+    x_train, x_train,
+    epochs=10,
+    batch_size=32,
+    validation_data=(x_test, x_test)
+)
+
+# Predict reconstructed images
+decoded_imgs = model.predict(x_test)
+
+# Visualize original vs reconstructed
+n = 5
+plt.figure(figsize=(10,4))
+
+for i in range(n):
+    # Original
+    plt.subplot(2, n, i+1)
+    plt.imshow(x_test[i].reshape(28,28), cmap='gray')
+    plt.axis('off')
+
+    # Reconstructed
+    plt.subplot(2, n, i+n+1)
+    plt.imshow(decoded_imgs[i].reshape(28,28), cmap='gray')
+    plt.axis('off')
+
+plt.show()
