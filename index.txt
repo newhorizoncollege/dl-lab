@@ -1,3 +1,102 @@
+exp-1
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv1D, Flatten, Dense
+
+# random data
+X = np.random.randn(500, 50, 1)
+y = np.random.randint(0, 2, 500)
+
+# model
+model = Sequential([
+    Conv1D(16, 3, activation='relu', input_shape=(50,1)),
+    Flatten(),
+    Dense(1, activation='sigmoid')
+])
+
+# compile
+model.compile(optimizer='adam',
+              loss='binary_crossentropy',
+              metrics=['accuracy'])
+
+# train
+model.fit(X, y, epochs=5, batch_size=16)
+
+# test
+print(model.evaluate(X, y))
+
+
+exp-2
+
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
+
+# load dataset
+(x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
+
+# normalize + reshape
+x_train = x_train.reshape(-1, 28, 28, 1) / 255.0
+x_test = x_test.reshape(-1, 28, 28, 1) / 255.0
+
+# model
+model = Sequential([
+    Conv2D(32, (3,3), activation='relu', input_shape=(28,28,1)),
+    MaxPooling2D(2,2),
+    Flatten(),
+    Dense(64, activation='relu'),
+    Dense(10, activation='softmax')
+])
+
+# compile
+model.compile(optimizer='adam',
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
+
+# train
+model.fit(x_train, y_train, epochs=5, batch_size=32)
+
+# test
+print(model.evaluate(x_test, y_test))
+
+exp-4
+
+import tensorflow as tf
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Embedding, LSTM, Dense
+
+# Load dataset (open-source)
+max_words = 10000   # vocabulary size
+max_len = 200       # fixed sequence length
+
+(x_train, y_train), (x_test, y_test) = tf.keras.datasets.imdb.load_data(num_words=max_words)
+
+# Handle variable-length sequences (padding)
+x_train = pad_sequences(x_train, maxlen=max_len, padding='post', truncating='post')
+x_test = pad_sequences(x_test, maxlen=max_len, padding='post', truncating='post')
+
+# LSTM model
+model = Sequential([
+    Embedding(input_dim=max_words, output_dim=128, input_length=max_len),
+    LSTM(64, return_sequences=False),
+    Dense(1, activation='sigmoid')
+])
+
+# compile
+model.compile(optimizer='adam',
+              loss='binary_crossentropy',
+              metrics=['accuracy'])
+
+# train
+model.fit(x_train, y_train, epochs=3, batch_size=64, validation_split=0.2)
+
+# evaluate
+print(model.evaluate(x_test, y_test))
+
+
+
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
@@ -29,6 +128,100 @@ model.fit(x_train, y_train, epochs=5, batch_size=32)
 loss, acc = model.evaluate(x_test, y_test)
 print("Accuracy:", acc)
 
+exp-5
+import tensorflow as tf
+import numpy as np
+
+# -----------------------------
+# PARAMETERS (change for dataset)
+# -----------------------------
+IMG_SIZE = 128
+BATCH_SIZE = 8
+NUM_CLASSES = 1   # binary segmentation (change if multi-class)
+
+# -----------------------------
+# LOAD IMAGE DATASET (example structure)
+# -----------------------------
+def load_data(image_path, mask_path):
+    image = tf.io.read_file(image_path)
+    image = tf.image.decode_jpeg(image, channels=3)
+    image = tf.image.resize(image, (IMG_SIZE, IMG_SIZE)) / 255.0
+
+    mask = tf.io.read_file(mask_path)
+    mask = tf.image.decode_png(mask, channels=1)
+    mask = tf.image.resize(mask, (IMG_SIZE, IMG_SIZE)) / 255.0
+
+    return image, mask
+
+# -----------------------------
+# DATA AUGMENTATION
+# -----------------------------
+def augment(image, mask):
+    if tf.random.uniform(()) > 0.5:
+        image = tf.image.flip_left_right(image)
+        mask = tf.image.flip_left_right(mask)
+
+    if tf.random.uniform(()) > 0.5:
+        image = tf.image.flip_up_down(image)
+        mask = tf.image.flip_up_down(mask)
+
+    return image, mask
+
+# -----------------------------
+# SAMPLE PIPELINE (replace with real dataset paths)
+# -----------------------------
+image_ds = tf.data.Dataset.list_files("images/*.jpg", shuffle=False)
+mask_ds = tf.data.Dataset.list_files("masks/*.png", shuffle=False)
+
+dataset = tf.data.Dataset.zip((image_ds, mask_ds))
+dataset = dataset.map(load_data)
+dataset = dataset.map(augment)
+dataset = dataset.batch(BATCH_SIZE)
+
+# -----------------------------
+# SIMPLE U-NET MODEL
+# -----------------------------
+def conv_block(x, filters):
+    x = tf.keras.layers.Conv2D(filters, 3, activation='relu', padding='same')(x)
+    x = tf.keras.layers.Conv2D(filters, 3, activation='relu', padding='same')(x)
+    return x
+
+def build_unet(input_size=(128,128,3)):
+    inputs = tf.keras.Input(input_size)
+
+    # Encoder
+    c1 = conv_block(inputs, 32)
+    p1 = tf.keras.layers.MaxPooling2D()(c1)
+
+    c2 = conv_block(p1, 64)
+    p2 = tf.keras.layers.MaxPooling2D()(c2)
+
+    # Bottleneck
+    c3 = conv_block(p2, 128)
+
+    # Decoder
+    u1 = tf.keras.layers.UpSampling2D()(c3)
+    u1 = tf.keras.layers.concatenate([u1, c2])
+    c4 = conv_block(u1, 64)
+
+    u2 = tf.keras.layers.UpSampling2D()(c4)
+    u2 = tf.keras.layers.concatenate([u2, c1])
+    c5 = conv_block(u2, 32)
+
+    outputs = tf.keras.layers.Conv2D(NUM_CLASSES, 1, activation='sigmoid')(c5)
+
+    model = tf.keras.Model(inputs, outputs)
+    return model
+
+# build model (adjustable for dataset)
+model = build_unet(input_size=(IMG_SIZE, IMG_SIZE, 3))
+
+# compile
+model.compile(optimizer='adam',
+              loss='binary_crossentropy',
+              metrics=['accuracy'])
+
+print(model.summary())
 
 EXP_8
 import tensorflow as tf
